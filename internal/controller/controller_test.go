@@ -43,24 +43,24 @@ func (m *MockRocketService) GetAllRocketStates() ([]model.Rocket, error) {
 
 // === END MOCKS === //
 
-// setupRouter configures a Gin router for testing.
-func setupRouter(mockService *MockRocketService) *gin.Engine {
+func setupRouter(mockService *MockRocketService, messageChannel chan model.IncomingMessage) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.Default()
 
 	r.RedirectTrailingSlash = false
 
-	controller := NewRocketController(mockService)
+	controller := NewRocketController(mockService, messageChannel)
 	r.POST("/messages", controller.MessageHandler)
 	r.GET("/rockets", controller.GetAllRocketsHandler)
 	r.GET("/rockets/:channel", controller.GetRocketStateHandler)
 	return r
 }
 
-// TestReceiveMessageHandler_Success tests successful message handling.
+// TestReceiveMessageHandler_Success tests successful message handling by sending to channel.
 func TestReceiveMessageHandler_Success(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage, 1)
+	router := setupRouter(mockService, testMessageChannel)
 
 	testMessage := model.IncomingMessage{
 		Metadata: model.Metadata{
@@ -73,23 +73,35 @@ func TestReceiveMessageHandler_Success(t *testing.T) {
 	}
 	msgBytes, _ := json.Marshal(testMessage)
 
-	mockService.On("ProcessMessage", mock.Anything).Return("processed", nil)
-
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/messages", bytes.NewBuffer(msgBytes))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), `"status":"processed"`)
+	assert.Equal(t, http.StatusAccepted, w.Code) // Expect 202 Accepted
+	assert.Contains(t, w.Body.String(), `"status":"accepted_for_processing"`)
 	assert.Contains(t, w.Body.String(), `"channel":"193270a9-c9cf-404a-8f83-838e71d9ae67"`)
-	mockService.AssertExpectations(t)
+
+	select {
+	case receivedMsg := <-testMessageChannel:
+		assert.Equal(t, testMessage.Metadata.Channel, receivedMsg.Metadata.Channel)
+		assert.Equal(t, testMessage.Metadata.MessageNumber, receivedMsg.Metadata.MessageNumber)
+		expectedMsgBytes, _ := json.Marshal(testMessage.Message)
+		actualMsgBytes, _ := json.Marshal(receivedMsg.Message)
+		assert.JSONEq(t, string(expectedMsgBytes), string(actualMsgBytes))
+	case <-time.After(time.Millisecond * 100):
+		t.Fatal("Message not received on channel within timeout")
+	}
+
+	mockService.AssertNotCalled(t, "ProcessMessage")
+	close(testMessageChannel)
 }
 
 // TestReceiveMessageHandler_InvalidJSON tests an invalid JSON payload.
 func TestReceiveMessageHandler_InvalidJSON(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage, 1)
+	router := setupRouter(mockService, testMessageChannel)
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/messages", bytes.NewBuffer([]byte(`{"invalid json`)))
@@ -98,13 +110,21 @@ func TestReceiveMessageHandler_InvalidJSON(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), `"error":"Invalid JSON or empty request body"`)
+
+	select {
+	case <-testMessageChannel:
+		t.Fatal("Unexpected message received on channel")
+	default:
+	}
 	mockService.AssertNotCalled(t, "ProcessMessage")
+	close(testMessageChannel)
 }
 
 // TestReceiveMessageHandler_MissingMetadata tests missing essential metadata.
 func TestReceiveMessageHandler_MissingMetadata(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage, 1)
+	router := setupRouter(mockService, testMessageChannel)
 
 	testMessage := model.IncomingMessage{
 		Metadata: model.Metadata{
@@ -124,41 +144,56 @@ func TestReceiveMessageHandler_MissingMetadata(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), `"error":"Invalid JSON or empty request body"`)
+
+	select {
+	case <-testMessageChannel:
+		t.Fatal("Unexpected message received on channel")
+	default:
+	}
 	mockService.AssertNotCalled(t, "ProcessMessage")
+	close(testMessageChannel)
 }
 
-// TestReceiveMessageHandler_ServiceError tests when the service returns an error.
-func TestReceiveMessageHandler_ServiceError(t *testing.T) {
+// TestReceiveMessageHandler_QueueFull tests when the message channel is full.
+func TestReceiveMessageHandler_QueueFull(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage)
+	router := setupRouter(mockService, testMessageChannel)
 
 	testMessage := model.IncomingMessage{
 		Metadata: model.Metadata{
-			Channel:       "channel-err",
+			Channel:       "channel-full",
 			MessageNumber: 1,
 			MessageTime:   time.Now(),
 			MessageType:   "RocketLaunched",
 		},
-		Message: json.RawMessage(`{"type": "Falcon-9"}`),
+		Message: json.RawMessage(`{"type": "Falcon-9", "launchSpeed": 500, "mission": "ARTEMIS"}`),
 	}
 	msgBytes, _ := json.Marshal(testMessage)
-
-	mockService.On("ProcessMessage", mock.Anything).Return("", errors.New("service error"))
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/messages", bytes.NewBuffer(msgBytes))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Contains(t, w.Body.String(), `"error":"Error processing message for channel channel-err"`)
-	mockService.AssertExpectations(t)
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code) // Expect 503 Service Unavailable
+	assert.Contains(t, w.Body.String(), `"error":"Message queue full, please try again later"`)
+
+	select { // Ensure no message was sent to the channel
+	case <-testMessageChannel:
+		t.Fatal("Unexpected message received on channel")
+	default:
+		// No message, as expected
+	}
+	mockService.AssertNotCalled(t, "ProcessMessage")
+	close(testMessageChannel)
 }
 
 // TestGetAllRocketsHandler_Success tests successful retrieval of all rockets.
 func TestGetAllRocketsHandler_Success(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage)
+	router := setupRouter(mockService, testMessageChannel)
 
 	expectedRockets := []model.Rocket{
 		{Channel: "193270a9-c9cf-404a-8f83-838e71d9ae67", Type: "Falcon-9", Speed: 500, Mission: "ARTEMIS"},
@@ -178,12 +213,14 @@ func TestGetAllRocketsHandler_Success(t *testing.T) {
 	assert.Len(t, actualRockets, 2)
 	assert.Equal(t, expectedRockets[0].Channel, actualRockets[0].Channel)
 	mockService.AssertExpectations(t)
+	close(testMessageChannel)
 }
 
 // TestGetAllRocketsHandler_ServiceError tests when the GetAll service returns an error.
 func TestGetAllRocketsHandler_ServiceError(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage)
+	router := setupRouter(mockService, testMessageChannel)
 
 	mockService.On("GetAllRocketStates").Return(nil, errors.New("foo bar error"))
 
@@ -194,12 +231,14 @@ func TestGetAllRocketsHandler_ServiceError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Contains(t, w.Body.String(), `"error":"Error while fetching rockets"`)
 	mockService.AssertExpectations(t)
+	close(testMessageChannel)
 }
 
 // TestGetRocketStateHandler_Success tests successful retrieval of a single rocket.
 func TestGetRocketStateHandler_Success(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage)
+	router := setupRouter(mockService, testMessageChannel)
 
 	expectedRocket := model.Rocket{Channel: "193270a9-c9cf-404a-8f83-838e71d9ae67", Type: "Falcon-9", Speed: 500, Mission: "ARTEMIS"}
 
@@ -215,28 +254,32 @@ func TestGetRocketStateHandler_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRocket.Channel, actualRocket.Channel)
 	mockService.AssertExpectations(t)
+	close(testMessageChannel)
 }
 
 // TestGetRocketStateHandler_NotFound tests when the rocket is not found.
 func TestGetRocketStateHandler_NotFound(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage)
+	router := setupRouter(mockService, testMessageChannel)
 
-	mockService.On("GetRocketState", "notFoundChannel").Return(nil, errors.New("rocket with channel notFoundChannel not found"))
+	mockService.On("GetRocketState", "non-existent-channel").Return(nil, errors.New("rocket with channel non-existent-channel not found"))
 
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/rockets/notFoundChannel", nil)
+	req, _ := http.NewRequest("GET", "/rockets/non-existent-channel", nil)
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Contains(t, w.Body.String(), `"error":"Rocket not found"`)
 	mockService.AssertExpectations(t)
+	close(testMessageChannel)
 }
 
 // TestGetRocketStateHandler_ServiceError tests when the Get service returns a generic error.
 func TestGetRocketStateHandler_ServiceError(t *testing.T) {
 	mockService := new(MockRocketService)
-	router := setupRouter(mockService)
+	testMessageChannel := make(chan model.IncomingMessage)
+	router := setupRouter(mockService, testMessageChannel)
 
 	mockService.On("GetRocketState", "errChannel").Return(nil, errors.New("internal repository error"))
 
@@ -247,4 +290,5 @@ func TestGetRocketStateHandler_ServiceError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Contains(t, w.Body.String(), `"error":"Error while fetching rocket errChannel"`)
 	mockService.AssertExpectations(t)
+	close(testMessageChannel)
 }

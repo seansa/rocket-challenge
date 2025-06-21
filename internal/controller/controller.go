@@ -11,17 +11,19 @@ import (
 	"github.com/seansa/rocket-challenge/internal/service"
 )
 
-type rocketController struct {
-	service service.Service
+type RocketController struct {
+	service        service.Service
+	messageChannel chan<- model.IncomingMessage
 }
 
-func NewRocketController(service service.Service) *rocketController {
-	return &rocketController{
-		service: service,
+func NewRocketController(service service.Service, msgChan chan<- model.IncomingMessage) *RocketController {
+	return &RocketController{
+		service:        service,
+		messageChannel: msgChan,
 	}
 }
 
-func (c *rocketController) MessageHandler(ctx *gin.Context) {
+func (c *RocketController) MessageHandler(ctx *gin.Context) {
 	var msg model.IncomingMessage
 
 	if err := ctx.ShouldBindJSON(&msg); err != nil {
@@ -29,18 +31,20 @@ func (c *rocketController) MessageHandler(ctx *gin.Context) {
 		return
 	}
 
-	resp, err := c.service.ProcessMessage(&msg)
-	if err != nil {
-		log.Printf("Error processing message in service: %v", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error processing message for channel %s", msg.Metadata.Channel), "details": err.Error()})
-		return
+	select {
+	case c.messageChannel <- msg:
+		log.Printf("Message for channel %s (msg #%d) accepted for processing.", msg.Metadata.Channel, msg.Metadata.MessageNumber)
+		// Return 202 Accepted, indicating the request has been accepted for processing.
+		ctx.JSON(http.StatusAccepted, gin.H{"status": "accepted_for_processing", "channel": msg.Metadata.Channel})
+	default:
+		// If the channel is full, respond with Service Unavailable (503).
+		log.Printf("Message for channel %s (msg #%d) rejected: message queue full.", msg.Metadata.Channel, msg.Metadata.MessageNumber)
+		ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "Message queue full, please try again later"})
 	}
-
-	ctx.JSON(http.StatusOK, gin.H{"status": resp, "channel": msg.Metadata.Channel})
 
 }
 
-func (c *rocketController) GetAllRocketsHandler(ctx *gin.Context) {
+func (c *RocketController) GetAllRocketsHandler(ctx *gin.Context) {
 	rockets, err := c.service.GetAllRocketStates()
 	if err != nil {
 		log.Printf("Error getting all rockets from service: %+v", err)
@@ -51,7 +55,7 @@ func (c *rocketController) GetAllRocketsHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, rockets)
 }
 
-func (c *rocketController) GetRocketStateHandler(ctx *gin.Context) {
+func (c *RocketController) GetRocketStateHandler(ctx *gin.Context) {
 	channel := ctx.Param("channel")
 
 	rocket, err := c.service.GetRocketState(channel)
