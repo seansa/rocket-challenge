@@ -76,3 +76,33 @@ func TestProcessMessage_NewRocket(t *testing.T) {
 	assert.Equal(t, "processed", status)
 	mockRepo.AssertExpectations(t)
 }
+
+// TestGetRocketState_Success tests successful retrieval of a rocket state.
+func TestGetRocketState_Success(t *testing.T) {
+	mockRepo := new(MockRocketRepository[model.Rocket])
+	svc := NewRocketService(mockRepo)
+
+	expectedRocket := model.NewRocket("193270a9-c9cf-404a-8f83-838e71d9ae67")
+	expectedRocket.Speed = 500
+
+	mockRepo.On("Get", "193270a9-c9cf-404a-8f83-838e71d9ae67").Return(expectedRocket, nil)
+
+	rocket, err := svc.GetRocketState("193270a9-c9cf-404a-8f83-838e71d9ae67")
+	assert.NoError(t, err)
+	assert.Equal(t, &expectedRocket, rocket)
+	mockRepo.AssertExpectations(t)
+}
+
+// TestGetRocketState_NotFound tests retrieval of a non-existent rocket.
+func TestGetRocketState_NotFound(t *testing.T) {
+	mockRepo := new(MockRocketRepository[model.Rocket])
+	svc := NewRocketService(mockRepo)
+
+	mockRepo.On("Get", "non-existent").Return(nil, errors.New("not found"))
+
+	rocket, err := svc.GetRocketState("non-existent")
+	assert.Error(t, err)
+	assert.Nil(t, rocket)
+	assert.Contains(t, err.Error(), "not found")
+	mockRepo.AssertExpectations(t)
+}
