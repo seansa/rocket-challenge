@@ -51,7 +51,7 @@ func setupRouter(mockService *MockRocketService) *gin.Engine {
 	r.RedirectTrailingSlash = false
 
 	controller := NewRocketController(mockService)
-	r.POST("/messages", controller.ReceiveMessageHandler)
+	r.POST("/messages", controller.MessageHandler)
 	r.GET("/rockets", controller.GetAllRocketsHandler)
 	r.GET("/rockets/:channel", controller.GetRocketStateHandler)
 	return r
@@ -143,7 +143,7 @@ func TestReceiveMessageHandler_ServiceError(t *testing.T) {
 	}
 	msgBytes, _ := json.Marshal(testMessage)
 
-	mockService.On("ProcessMessage", mock.Anything).Return("", errors.New("simulated service error"))
+	mockService.On("ProcessMessage", mock.Anything).Return("", errors.New("service error"))
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/messages", bytes.NewBuffer(msgBytes))
@@ -152,5 +152,45 @@ func TestReceiveMessageHandler_ServiceError(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Contains(t, w.Body.String(), `"error":"Error processing message for channel channel-err"`)
+	mockService.AssertExpectations(t)
+}
+
+// TestGetAllRocketsHandler_Success tests successful retrieval of all rockets.
+func TestGetAllRocketsHandler_Success(t *testing.T) {
+	mockService := new(MockRocketService)
+	router := setupRouter(mockService)
+
+	expectedRockets := []*model.Rocket{
+		{Channel: "193270a9-c9cf-404a-8f83-838e71d9ae67", Type: "Falcon-9", Speed: 500, Mission: "ARTEMIS"},
+	}
+
+	mockService.On("GetAllRocketStates").Return(expectedRockets, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/rockets", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var actualRockets []*model.Rocket
+	err := json.Unmarshal(w.Body.Bytes(), &actualRockets)
+	assert.NoError(t, err)
+	assert.Len(t, actualRockets, 1)
+	assert.Equal(t, expectedRockets[0].Channel, actualRockets[0].Channel)
+	mockService.AssertExpectations(t)
+}
+
+// TestGetAllRocketsHandler_ServiceError tests when the GetAll service returns an error.
+func TestGetAllRocketsHandler_ServiceError(t *testing.T) {
+	mockService := new(MockRocketService)
+	router := setupRouter(mockService)
+
+	mockService.On("GetAllRocketStates").Return(nil, errors.New("foo bar error"))
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/rockets", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), `"error":"Error while fetching rockets"`)
 	mockService.AssertExpectations(t)
 }

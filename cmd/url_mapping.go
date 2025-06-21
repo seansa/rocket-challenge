@@ -10,7 +10,7 @@ func mapUrls(r *gin.Engine) {
 	service := service.NewRocketService()
 	controller := controller.NewRocketController(service)
 
-	r.POST("/messages", controller.ReceiveMessageHandler)
+	r.POST("/messages", controller.MessageHandler)
 	r.GET("/rockets", controller.GetAllRocketsHandler)
 	r.GET("/rockets/:channel", controller.GetRocketStateHandler)
 

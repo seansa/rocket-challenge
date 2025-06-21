@@ -20,7 +20,7 @@ func NewRocketController(service service.Service) *rocketController {
 	}
 }
 
-func (c *rocketController) ReceiveMessageHandler(ctx *gin.Context) {
+func (c *rocketController) MessageHandler(ctx *gin.Context) {
 	var msg model.IncomingMessage
 
 	if err := ctx.ShouldBindJSON(&msg); err != nil {
@@ -40,9 +40,14 @@ func (c *rocketController) ReceiveMessageHandler(ctx *gin.Context) {
 }
 
 func (c *rocketController) GetAllRocketsHandler(ctx *gin.Context) {
-	ctx.JSON(200, gin.H{
-		"message": "All rockets retrieved successfully",
-	})
+	rockets, err := c.service.GetAllRocketStates()
+	if err != nil {
+		log.Printf("Error getting all rockets from service: %+v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error while fetching rockets", "details": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, rockets)
 }
 
 func (c *rocketController) GetRocketStateHandler(ctx *gin.Context) {
