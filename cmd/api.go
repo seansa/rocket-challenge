@@ -5,10 +5,14 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/seansa/rocket-challenge/docs"
 	"github.com/seansa/rocket-challenge/internal/controller"
 	"github.com/seansa/rocket-challenge/internal/model"
 	"github.com/seansa/rocket-challenge/internal/repository"
 	"github.com/seansa/rocket-challenge/internal/service"
+	swaggerFiles "github.com/swaggo/files"
+
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 var (
@@ -48,6 +52,8 @@ func setupRoutes() *gin.Engine {
 	r.POST("/messages", ctrl.MessageHandler)
 	r.GET("/rockets", ctrl.GetAllRocketsHandler)
 	r.GET("/rockets/:channel", ctrl.GetRocketStateHandler)
+
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	return r
 }

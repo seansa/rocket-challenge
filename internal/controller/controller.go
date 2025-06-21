@@ -23,6 +23,17 @@ func NewRocketController(service service.Service, msgChan chan<- model.IncomingM
 	}
 }
 
+// MessageHandler handles incoming POST requests to the /messages endpoint.
+// @Summary Receive rocket message
+// @Description Processes an incoming rocket state message. Handles out-of-order and duplicate messages.
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Param message body model.IncomingMessage true "Rocket message payload"
+// @Success 200 {object} map[string]string "Status of message processing"
+// @Failure 400 {object} map[string]string "Invalid JSON or bad request"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /messages [post]
 func (c *RocketController) MessageHandler(ctx *gin.Context) {
 	var msg model.IncomingMessage
 
@@ -44,6 +55,14 @@ func (c *RocketController) MessageHandler(ctx *gin.Context) {
 
 }
 
+// GetAllRocketsHandler handles GET requests to the /rockets endpoint.
+// @Summary Get all rocket states
+// @Description Returns a list of the current states of all rockets in the system, sorted by channel ID.
+// @Tags rockets
+// @Produce json
+// @Success 200 {array} model.Rocket "List of all rockets"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /rockets [get]
 func (c *RocketController) GetAllRocketsHandler(ctx *gin.Context) {
 	rockets, err := c.service.GetAllRocketStates()
 	if err != nil {
@@ -55,6 +74,17 @@ func (c *RocketController) GetAllRocketsHandler(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, rockets)
 }
 
+// GetRocketStateHandler handles GET requests to the /rockets/{channel} endpoint.
+// @Summary Get a single rocket state
+// @Description Returns the current state of a specific rocket by its channel ID.
+// @Tags rockets
+// @Produce json
+// @Param channel path string true "Rocket Channel ID"
+// @Success 200 {object} model.Rocket "Current state of the rocket"
+// @Failure 400 {object} map[string]string "Missing rocket channel ID"
+// @Failure 404 {object} map[string]string "Rocket not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /rockets/{channel} [get]
 func (c *RocketController) GetRocketStateHandler(ctx *gin.Context) {
 	channel := ctx.Param("channel")
 

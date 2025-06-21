@@ -56,8 +56,8 @@ func setupRouter(mockService *MockRocketService, messageChannel chan model.Incom
 	return r
 }
 
-// TestReceiveMessageHandler_Success tests successful message handling by sending to channel.
-func TestReceiveMessageHandler_Success(t *testing.T) {
+// TestMessageHandler_Success tests successful message handling by sending to channel.
+func TestMessageHandler_Success(t *testing.T) {
 	mockService := new(MockRocketService)
 	testMessageChannel := make(chan model.IncomingMessage, 1)
 	router := setupRouter(mockService, testMessageChannel)
@@ -97,8 +97,8 @@ func TestReceiveMessageHandler_Success(t *testing.T) {
 	close(testMessageChannel)
 }
 
-// TestReceiveMessageHandler_InvalidJSON tests an invalid JSON payload.
-func TestReceiveMessageHandler_InvalidJSON(t *testing.T) {
+// TestMessageHandler_InvalidJSON tests an invalid JSON payload.
+func TestMessageHandler_InvalidJSON(t *testing.T) {
 	mockService := new(MockRocketService)
 	testMessageChannel := make(chan model.IncomingMessage, 1)
 	router := setupRouter(mockService, testMessageChannel)
@@ -120,8 +120,8 @@ func TestReceiveMessageHandler_InvalidJSON(t *testing.T) {
 	close(testMessageChannel)
 }
 
-// TestReceiveMessageHandler_MissingMetadata tests missing essential metadata.
-func TestReceiveMessageHandler_MissingMetadata(t *testing.T) {
+// TestMessageHandler_MissingMetadata tests missing essential metadata.
+func TestMessageHandler_MissingMetadata(t *testing.T) {
 	mockService := new(MockRocketService)
 	testMessageChannel := make(chan model.IncomingMessage, 1)
 	router := setupRouter(mockService, testMessageChannel)
@@ -154,8 +154,8 @@ func TestReceiveMessageHandler_MissingMetadata(t *testing.T) {
 	close(testMessageChannel)
 }
 
-// TestReceiveMessageHandler_QueueFull tests when the message channel is full.
-func TestReceiveMessageHandler_QueueFull(t *testing.T) {
+// TestMessageHandler_QueueFull tests when the message channel is full.
+func TestMessageHandler_QueueFull(t *testing.T) {
 	mockService := new(MockRocketService)
 	testMessageChannel := make(chan model.IncomingMessage)
 	router := setupRouter(mockService, testMessageChannel)
