@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 )
 
@@ -42,11 +43,15 @@ func (r *repository[T]) GetAll() ([]T, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	var items []T
+	items := make([]T, 0, len(r.db))
 
 	for _, item := range r.db {
 		items = append(items, item)
 	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].GetKey() < items[j].GetKey()
+	})
 
 	return items, nil
 }
