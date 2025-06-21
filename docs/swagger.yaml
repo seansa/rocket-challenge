@@ -1,0 +1,156 @@
+basePath: /
+definitions:
+  model.IncomingMessage:
+    type: object
+  model.MessageType:
+    enum:
+    - RocketLaunched
+    - RocketSpeedIncreased
+    - RocketSpeedDecreased
+    - RocketExploded
+    - RocketMissionChanged
+    type: string
+    x-enum-varnames:
+    - RocketLaunched
+    - RocketSpeedIncreased
+    - RocketSpeedDecreased
+    - RocketExploded
+    - RocketMissionChanged
+  model.Metadata:
+    properties:
+      channel:
+        type: string
+      messageNumber:
+        type: integer
+      messageTime:
+        type: string
+      messageType:
+        $ref: '#/definitions/model.MessageType'
+    required:
+    - channel
+    - messageNumber
+    - messageTime
+    - messageType
+    type: object
+  model.Rocket:
+    properties:
+      channel:
+        type: string
+      exploded:
+        type: boolean
+      explosionReason:
+        type: string
+      mission:
+        type: string
+      speed:
+        type: integer
+      type:
+        type: string
+    type: object
+host: localhost:8088
+info:
+  contact: {}
+  description: This is a service that consumes messages from rockets and exposes their
+    via a REST API.
+  title: Rocket Service API
+  version: "1.0"
+paths:
+  /messages:
+    post:
+      consumes:
+      - application/json
+      description: Processes an incoming rocket state message. Handles out-of-order
+        and duplicate messages.
+      parameters:
+      - description: Rocket message payload
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/model.IncomingMessage'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Status of message processing
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid JSON or bad request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Receive rocket message
+      tags:
+      - messages
+  /rockets:
+    get:
+      description: Returns a list of the current states of all rockets in the system,
+        sorted by channel ID.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of all rockets
+          schema:
+            items:
+              $ref: '#/definitions/model.Rocket'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all rocket states
+      tags:
+      - rockets
+  /rockets/{channel}:
+    get:
+      description: Returns the current state of a specific rocket by its channel ID.
+      parameters:
+      - description: Rocket Channel ID
+        in: path
+        name: channel
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Current state of the rocket
+          schema:
+            $ref: '#/definitions/model.Rocket'
+        "400":
+          description: Missing rocket channel ID
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Rocket not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a single rocket state
+      tags:
+      - rockets
+schemes:
+- http
+swagger: "2.0"
