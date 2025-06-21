@@ -13,14 +13,14 @@ type IncomingMessage struct {
 
 // Metadata represents the 'metadata' section of a rocket message.
 type Metadata struct {
-	Channel       string    `json:"channel" binding:"required"`
-	MessageNumber int       `json:"messageNumber" binding:"required"`
-	MessageTime   time.Time `json:"messageTime" binding:"required"`
-	MessageType   string    `json:"messageType" binding:"required"`
+	Channel       string      `json:"channel" binding:"required"`
+	MessageNumber int         `json:"messageNumber" binding:"required"`
+	MessageTime   time.Time   `json:"messageTime" binding:"required"`
+	MessageType   MessageType `json:"messageType" binding:"required"`
 }
 
-// Message represents the 'message' section for the RocketLaunched type.
-type Message struct {
+// LaunchedMessage represents the 'message' section for the RocketLaunched type.
+type LaunchedMessage struct {
 	Type        string `json:"type"`
 	LaunchSpeed int    `json:"launchSpeed"`
 	Mission     string `json:"mission"`
