@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/seansa/rocket-challenge/internal/model"
@@ -51,7 +52,19 @@ func (c *rocketController) GetAllRocketsHandler(ctx *gin.Context) {
 }
 
 func (c *rocketController) GetRocketStateHandler(ctx *gin.Context) {
-	ctx.JSON(200, gin.H{
-		"message": "Rocket state retrieved successfully",
-	})
+	channel := ctx.Param("channel")
+
+	rocket, err := c.service.GetRocketState(channel)
+	if err != nil {
+		//TODO: create a custom error type for better error handling
+		if strings.Contains(err.Error(), "not found") {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "Rocket not found", "channel": channel})
+		} else {
+			log.Printf("Error getting rocket state %s from service: %v", channel, err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error while fetching rocket %s", channel), "details": err.Error()})
+		}
+		return
+	}
+
+	ctx.JSON(http.StatusOK, rocket)
 }
