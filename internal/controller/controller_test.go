@@ -25,20 +25,20 @@ func (m *MockRocketService) ProcessMessage(msg *model.IncomingMessage) (string, 
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockRocketService) GetRocketState(channel string) (*model.Rocket, error) {
+func (m *MockRocketService) GetRocketState(channel string) (model.Rocket, error) {
 	args := m.Called(channel)
 	if args.Get(0) == nil {
-		return nil, args.Error(1)
+		return model.Rocket{}, args.Error(1)
 	}
-	return args.Get(0).(*model.Rocket), args.Error(1)
+	return args.Get(0).(model.Rocket), args.Error(1)
 }
 
-func (m *MockRocketService) GetAllRocketStates() ([]*model.Rocket, error) {
+func (m *MockRocketService) GetAllRocketStates() ([]model.Rocket, error) {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*model.Rocket), args.Error(1)
+	return args.Get(0).([]model.Rocket), args.Error(1)
 }
 
 // === END MOCKS === //
@@ -160,7 +160,7 @@ func TestGetAllRocketsHandler_Success(t *testing.T) {
 	mockService := new(MockRocketService)
 	router := setupRouter(mockService)
 
-	expectedRockets := []*model.Rocket{
+	expectedRockets := []model.Rocket{
 		{Channel: "193270a9-c9cf-404a-8f83-838e71d9ae67", Type: "Falcon-9", Speed: 500, Mission: "ARTEMIS"},
 		{Channel: "193270a9-c9cf-404a-8f83-838e71d9ae68", Type: "Falcon-8", Speed: 1500, Mission: "ARTEMIS2"},
 	}
@@ -172,7 +172,7 @@ func TestGetAllRocketsHandler_Success(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var actualRockets []*model.Rocket
+	var actualRockets []model.Rocket
 	err := json.Unmarshal(w.Body.Bytes(), &actualRockets)
 	assert.NoError(t, err)
 	assert.Len(t, actualRockets, 2)
@@ -201,7 +201,7 @@ func TestGetRocketStateHandler_Success(t *testing.T) {
 	mockService := new(MockRocketService)
 	router := setupRouter(mockService)
 
-	expectedRocket := &model.Rocket{Channel: "193270a9-c9cf-404a-8f83-838e71d9ae67", Type: "Falcon-9", Speed: 500, Mission: "ARTEMIS"}
+	expectedRocket := model.Rocket{Channel: "193270a9-c9cf-404a-8f83-838e71d9ae67", Type: "Falcon-9", Speed: 500, Mission: "ARTEMIS"}
 
 	mockService.On("GetRocketState", "193270a9-c9cf-404a-8f83-838e71d9ae67").Return(expectedRocket, nil)
 

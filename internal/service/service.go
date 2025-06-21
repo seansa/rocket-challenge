@@ -10,8 +10,8 @@ import (
 
 type Service interface {
 	ProcessMessage(msg *model.IncomingMessage) (string, error)
-	GetRocketState(channel string) (*model.Rocket, error)
-	GetAllRocketStates() ([]*model.Rocket, error)
+	GetRocketState(channel string) (model.Rocket, error)
+	GetAllRocketStates() ([]model.Rocket, error)
 }
 
 type service struct {
@@ -47,15 +47,20 @@ func (s *service) ProcessMessage(msg *model.IncomingMessage) (string, error) {
 	return "processed", nil
 }
 
-func (s *service) GetRocketState(channel string) (*model.Rocket, error) {
+func (s *service) GetRocketState(channel string) (model.Rocket, error) {
 	rocket, err := s.repo.Get(channel)
+	if err != nil {
+		return model.Rocket{}, err
+	}
+	log.Printf("Returning state for rocket %s.", channel)
+	return rocket, nil
+}
+
+func (s *service) GetAllRocketStates() ([]model.Rocket, error) {
+	rockets, err := s.repo.GetAll()
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Returning state for rocket %s.", channel)
-	return &rocket, nil
-}
-
-func (s *service) GetAllRocketStates() ([]*model.Rocket, error) {
-	panic("Implement me")
+	log.Printf("Returning list of %d rockets.", len(rockets))
+	return rockets, nil
 }

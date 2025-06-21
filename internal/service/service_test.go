@@ -89,7 +89,7 @@ func TestGetRocketState_Success(t *testing.T) {
 
 	rocket, err := svc.GetRocketState("193270a9-c9cf-404a-8f83-838e71d9ae67")
 	assert.NoError(t, err)
-	assert.Equal(t, &expectedRocket, rocket)
+	assert.Equal(t, expectedRocket, rocket)
 	mockRepo.AssertExpectations(t)
 }
 
@@ -102,7 +102,39 @@ func TestGetRocketState_NotFound(t *testing.T) {
 
 	rocket, err := svc.GetRocketState("non-existent")
 	assert.Error(t, err)
-	assert.Nil(t, rocket)
+	assert.Zero(t, rocket)
 	assert.Contains(t, err.Error(), "not found")
+	mockRepo.AssertExpectations(t)
+}
+
+// TestGetAllRocketStates_Success tests successful retrieval of all rocket states.
+func TestGetAllRocketStates_Success(t *testing.T) {
+	mockRepo := new(MockRocketRepository[model.Rocket])
+	svc := NewRocketService(mockRepo)
+
+	expectedRockets := []model.Rocket{
+		model.NewRocket("193270a9-c9cf-404a-8f83-838e71d9ae67"),
+		model.NewRocket("193270a9-c9cf-404a-8f83-838e71d9ae68"),
+	}
+
+	mockRepo.On("GetAll").Return(expectedRockets, nil)
+
+	rockets, err := svc.GetAllRocketStates()
+	assert.NoError(t, err)
+	assert.Equal(t, expectedRockets, rockets)
+	mockRepo.AssertExpectations(t)
+}
+
+// TestGetAllRocketStates_RepoError tests repository error during GetAllRockets.
+func TestGetAllRocketStates_RepoError(t *testing.T) {
+	mockRepo := new(MockRocketRepository[model.Rocket])
+	svc := NewRocketService(mockRepo)
+
+	mockRepo.On("GetAll").Return(nil, errors.New("repo error"))
+
+	rockets, err := svc.GetAllRocketStates()
+	assert.Error(t, err)
+	assert.Nil(t, rockets)
+	assert.Contains(t, err.Error(), "repo error")
 	mockRepo.AssertExpectations(t)
 }
