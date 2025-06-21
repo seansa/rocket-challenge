@@ -1,21 +1,22 @@
 package model
 
 import (
+	"encoding/json"
 	"time"
 )
 
 // IncomingMessage represents the full structure of an incoming JSON message.
 type IncomingMessage struct {
-	Metadata Metadata              `json:"metadata"`
-	Message  Message `json:"message"`
+	Metadata Metadata        `json:"metadata"`
+	Message  json.RawMessage `json:"message"`
 }
 
 // Metadata represents the 'metadata' section of a rocket message.
 type Metadata struct {
-	Channel       string    `json:"channel"`
-	MessageNumber int       `json:"messageNumber"`
-	MessageTime   time.Time `json:"messageTime"`
-	MessageType   string    `json:"messageType"`
+	Channel       string    `json:"channel" binding:"required"`
+	MessageNumber int       `json:"messageNumber" binding:"required"`
+	MessageTime   time.Time `json:"messageTime" binding:"required"`
+	MessageType   string    `json:"messageType" binding:"required"`
 }
 
 // Message represents the 'message' section for the RocketLaunched type.
