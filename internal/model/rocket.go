@@ -16,3 +16,9 @@ func NewRocket(channel string) *Rocket {
 		Channel: channel,
 	}
 }
+
+// GetKey returns the unique key for the Rocket, which is its channel.
+// This key is used for storing and retrieving the rocket in a repository.
+func (r Rocket) GetKey() string {
+	return r.Channel
+}
