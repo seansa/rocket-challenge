@@ -28,13 +28,13 @@ The service has been refactored to use Go goroutines and channels to process roc
 - Several worker goroutines (launched from main and managed in the service package) consume messages from this channel concurrently. This allows the HTTP handler to respond quickly (202 Accepted), without waiting for the message to be fully processed.
 - If the channel is full, the service responds with 503 Service Unavailable, indicating temporary overload.
 
-## Technologies Used 🛠️
+## Technologies Used
 - Go (Golang): The primary programming language.
 - Gin-Gonic: A high-performance web framework for Go, used to build the REST API.
 - Swaggo: A tool to automatically generate Swagger/OpenAPI documentation from Go code annotations.
 - Testify (Mock & Assert): A Go library to facilitate unit testing and assertions, as well as to create mocks for dependencies.
 
-## How to Run the Application 🚀
+## How to Run the Application
 ### Prerequisites
 Make sure you have the following installed:
 
@@ -44,20 +44,28 @@ Make sure you have the following installed:
 Project Structure
 Ensure your project has the following directory structure:
 ```
-go-rocket-service/
+rocket-challenge
 ├── main.go
-├── controller/
-│   ├── controller.go
-│   └── controller_test.go
-├── model/
-│   ├── model.go
-│   └── model_test.go
-├── repository/
-│   ├── repository.go
-│   └── repository_test.go
-└── service/
-    ├── service.go
-    └── service_test.go
+├── docs
+│   ├── swagger.json
+│   ├── swagger.json
+│   └── docs.go.go
+├── cmd
+│   └── api.go
+└── internal
+    ├── controller/
+    │   ├── controller.go
+    │   └── controller_test.go
+    ├── model/
+    │   ├── request.go
+    │   └── rocket.go
+    ├── repository/
+    │   ├── repository.go
+    │   └── repository_test.go
+    └── service/
+        ├── processor.go
+        ├── service.go
+        └── service_test.go
 ```
 
 ### Steps to Run
@@ -105,7 +113,7 @@ go tool cover -html=coverage.out -o coverage.html
 
 - make clean: Deletes generated files from tests and Swagger (coverage reports, docs folder).
 
-## Design Decisions and Trade-offs 📝
+## Design Decisions and Trade-offs
 1. In-Memory Storage
 - Decision: Use a Go in-memory generic map (map[string]T) to store rocket states.
 - Advantages: Simple to implement, no external database configuration required, very high read/write speed (for a single node).
@@ -157,7 +165,7 @@ Decision: Layers (controller, service, repository) are constructed by receiving 
 - - Disadvantages: Can add some "boilerplate" (repetitive code) during application initialization.
 - - Trade-off: Maintainability and testability over initial conciseness.
 
-## Automated Tests ✅
+## Automated Tests
 The project includes a comprehensive set of unit tests for the controller, service, model, and repository layers.
 
 - The controller tests use a mock of the service and a message channel to verify that HTTP requests are handled correctly and that messages are enqueued as expected.
