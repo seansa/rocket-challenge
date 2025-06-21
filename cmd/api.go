@@ -12,6 +12,8 @@ func Run() {
 
 	port := getOrDefault("PORT", ":8088")
 
+	mapUrls(router)
+
 	log.Printf("Server listening on http://localhost%s", port)
 	log.Fatal(router.Run(port))
 }
